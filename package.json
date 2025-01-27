@@ -13,6 +13,7 @@
   "type": "commonjs",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.2",
     "@picovoice/porcupine-react": "^3.0.3",
     "@picovoice/porcupine-web": "^3.0.3",
     "@picovoice/web-voice-processor": "^4.0.9",
