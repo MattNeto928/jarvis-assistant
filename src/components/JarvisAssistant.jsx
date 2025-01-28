@@ -3,6 +3,7 @@ import { Mic, MicOff, Settings, Volume2, Loader, Brain } from 'lucide-react';
 import { usePorcupine } from '@picovoice/porcupine-react';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import SmartMirrorUI from './SmartMirrorUI';
 
 // Initialize API clients
 const openai = new OpenAI({
@@ -43,14 +44,14 @@ const AudioProcessor = {
   context: null,
   analyserNode: null,
   source: null,
-  
+
   async initialize() {
     this.context = new (window.AudioContext || window.webkitAudioContext)();
     this.analyserNode = this.context.createAnalyser();
     this.analyserNode.fftSize = 1024; // Reduced for better performance
-    
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           sampleRate: 16000,
@@ -58,7 +59,7 @@ const AudioProcessor = {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
-        } 
+        }
       });
       stream.getTracks().forEach(track => track.stop());
     } catch (error) {
@@ -81,7 +82,7 @@ class ParallelAudioPlayer {
   // Queue a new sentence for TTS processing
   async queueSentence(sentence) {
     if (!sentence.trim()) return;
-    
+
     try {
       // Check cache first
       if (this.audioCache.has(sentence)) {
@@ -89,7 +90,7 @@ class ParallelAudioPlayer {
           url: this.audioCache.get(sentence),
           text: sentence
         });
-        
+
         if (!this.isPlaying) {
           this.playNextInQueue();
         }
@@ -124,7 +125,7 @@ class ParallelAudioPlayer {
     try {
       const audioUrl = await this.fetchTTSAudio(text);
       this.audioCache.set(text, audioUrl);
-      
+
       this.audioQueue.push({
         url: audioUrl,
         text: text
@@ -133,7 +134,7 @@ class ParallelAudioPlayer {
       if (!this.isPlaying) {
         this.playNextInQueue();
       }
-      
+
       resolve();
     } catch (error) {
       reject(error);
@@ -169,7 +170,7 @@ class ParallelAudioPlayer {
           URL.revokeObjectURL(this.audioCache.get(firstKey));
           this.audioCache.delete(firstKey);
         }
-        
+
         // Play next audio in queue
         this.playNextInQueue();
       }, { once: true });
@@ -227,12 +228,12 @@ const JarvisAssistant = () => {
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedModel, setSelectedModel] = useState('sonar');
-  
+
   const audioPlayer = useRef(new ParallelAudioPlayer());
   const isRecording = useRef(false);
   const recordedChunks = useRef([]);
   const silenceStart = useRef(null);
-  
+
   const SILENCE_THRESHOLD = 0.01;
   const SILENCE_DURATION = 1000;
 
@@ -274,26 +275,26 @@ const JarvisAssistant = () => {
         stream: true // Enable streaming
       })
     });
-  
+
     if (!response.ok) {
       throw new Error(`Sonar API error: ${response.status}`);
     }
-  
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-  
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-  
+
       // Decode the chunk and add to buffer
       buffer += decoder.decode(value, { stream: true });
-  
+
       // Process complete messages
       const lines = buffer.split('\n');
       buffer = lines.pop() || ''; // Keep incomplete line in buffer
-  
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
@@ -308,7 +309,7 @@ const JarvisAssistant = () => {
       }
     }
   };
-  
+
   const callClaude = async (text, onChunk) => {
     const stream = await anthropic.messages.create({
       model: 'claude-3-opus-20240229',
@@ -317,7 +318,7 @@ const JarvisAssistant = () => {
       messages: [{ role: 'user', content: text }],
       stream: true
     });
-  
+
     let fullResponse = '';
     for await (const chunk of stream) {
       if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
@@ -327,7 +328,7 @@ const JarvisAssistant = () => {
     }
     return fullResponse;
   };
-  
+
   const callGPT4 = async (text, onChunk) => {
     const stream = await openai.chat.completions.create({
       model: 'gpt-4-turbo-preview',
@@ -337,7 +338,7 @@ const JarvisAssistant = () => {
       ],
       stream: true
     });
-  
+
     let fullResponse = '';
     for await (const chunk of stream) {
       if (chunk.choices[0]?.delta?.content) {
@@ -348,7 +349,7 @@ const JarvisAssistant = () => {
     }
     return fullResponse;
   };
-  
+
   const callDeepseek = async (text, onChunk) => {
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
@@ -367,23 +368,23 @@ const JarvisAssistant = () => {
         stream: true
       })
     });
-  
+
     if (!response.ok) {
       throw new Error(`DeepSeek API error: ${response.status}`);
     }
-  
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-  
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-  
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-  
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
@@ -398,23 +399,23 @@ const JarvisAssistant = () => {
       }
     }
   };
-  
+
   const processCommand = async (text) => {
     try {
       setStatus('processing');
       let currentSentence = '';
       let fullResponse = '';
-  
+
       // Helper function to detect sentence boundaries
       const isSentenceEnd = (char) => {
         return ['.', '!', '?'].includes(char);
       };
-  
+
       const handleChunk = (chunk) => {
         fullResponse += chunk;
         currentSentence += chunk;
         setResponse(fullResponse);
-  
+
         // Check for sentence boundaries in the new chunk
         const lastChar = chunk[chunk.length - 1];
         if (isSentenceEnd(lastChar) && currentSentence.trim().length > 0) {
@@ -423,7 +424,7 @@ const JarvisAssistant = () => {
           currentSentence = '';
         }
       };
-  
+
       switch (selectedModel) {
         case 'sonar':
           await callSonar(text, handleChunk);
@@ -440,14 +441,14 @@ const JarvisAssistant = () => {
         default:
           throw new Error('Invalid model selected');
       }
-  
+
       // Queue any remaining text as a sentence
       if (currentSentence.trim().length > 0) {
         audioPlayer.current.queueSentence(currentSentence.trim());
       }
-  
+
       setStatus('idle');
-  
+
     } catch (error) {
       console.error('Command processing failed:', error);
       setErrorMessage(`Failed to process command: ${error.message}`);
@@ -464,8 +465,8 @@ const JarvisAssistant = () => {
   const startRecording = async () => {
     try {
       setStatus('listening');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           sampleRate: 16000,
@@ -473,27 +474,27 @@ const JarvisAssistant = () => {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
-        } 
+        }
       });
-  
+
       const source = AudioProcessor.context.createMediaStreamSource(stream);
       source.connect(AudioProcessor.analyserNode);
-  
+
       recordedChunks.current = [];
       isRecording.current = true;
-  
+
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm;codecs=opus'
       });
-  
+
       const checkAudioLevel = () => {
         if (!isRecording.current) return;
-  
+
         const dataArray = new Float32Array(AudioProcessor.analyserNode.fftSize);
         AudioProcessor.analyserNode.getFloatTimeDomainData(dataArray);
-        
+
         const rms = Math.sqrt(dataArray.reduce((sum, val) => sum + val * val, 0) / dataArray.length);
-        
+
         if (rms < SILENCE_THRESHOLD) {
           if (!silenceStart.current) {
             silenceStart.current = Date.now();
@@ -505,21 +506,21 @@ const JarvisAssistant = () => {
         } else {
           silenceStart.current = null;
         }
-        
+
         requestAnimationFrame(checkAudioLevel);
       };
-  
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           recordedChunks.current.push(event.data);
         }
       };
-  
+
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
         processRecordedAudio();
       };
-  
+
       mediaRecorder.start(1000);
       checkAudioLevel();
 
@@ -533,16 +534,16 @@ const JarvisAssistant = () => {
   const processRecordedAudio = async () => {
     try {
       setStatus('processing');
-  
+
       const audioBlob = new Blob(recordedChunks.current, { type: 'audio/webm' });
       const audioFile = await convertAudioToMp3(audioBlob);
-  
+
       const transcription = await openai.audio.transcriptions.create({
         file: audioFile,
         model: 'whisper-1',
         language: 'en'
       });
-  
+
       setTranscript(transcription.text);
       await processCommand(transcription.text);
       setStatus('idle');
@@ -646,7 +647,7 @@ const JarvisAssistant = () => {
     // Initialize audio processor on component mount
     AudioProcessor.initialize().catch(console.error);
     initPorcupine();
-    
+
     return () => {
       release();
       audioPlayer.current.stop();
@@ -699,78 +700,17 @@ const JarvisAssistant = () => {
 
   // UI Component
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gray-900">
-      <div className="w-full max-w-2xl bg-gray-800 rounded-lg shadow-xl p-6">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-white">Jarvis Assistant</h1>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={cycleModel}
-              className={`px-4 py-2 rounded-lg ${LLM_CONFIGS[selectedModel].color} hover:opacity-90 text-white flex items-center gap-2 transition-all duration-200`}
-            >
-              <Brain className="w-5 h-5" />
-              <span className="text-sm font-medium">{LLM_CONFIGS[selectedModel].name}</span>
-              <span className="text-xs opacity-75">({LLM_CONFIGS[selectedModel].description})</span>
-            </button>
-
-            {isListening ? (
-              <button className="p-2 rounded-full bg-green-600 hover:bg-green-700 text-white">
-                <Mic className="w-6 h-6" />
-              </button>
-            ) : (
-              <button
-                className="p-2 rounded-full bg-red-600 hover:bg-red-700 text-white"
-                onClick={retryInitialization}
-              >
-                <MicOff className="w-6 h-6" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-gray-700 rounded-lg p-4">
-            <h2 className="text-lg font-semibold text-white mb-2">Status</h2>
-            <div className="flex items-center text-gray-300">
-              {status === 'processing' && <Loader className="w-4 h-4 mr-2 animate-spin" />}
-              <p>
-                {status === 'idle' && 'Waiting for wake word "Jarvis"...'}
-                {status === 'listening' && 'Listening for command...'}
-                {status === 'processing' && 'Processing...'}
-                {status === 'error' && (
-                  <span className="text-red-400">
-                    Error: {errorMessage}
-                    <button
-                      onClick={retryInitialization}
-                      className="ml-2 text-blue-400 hover:text-blue-300 underline"
-                    >
-                      Retry
-                    </button>
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {transcript && (
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h2 className="text-lg font-semibold text-white mb-2">You said:</h2>
-              <p className="text-gray-300">{transcript}</p>
-            </div>
-          )}
-
-          {response && (
-            <div className="bg-gray-700 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Volume2 className="w-5 h-5 text-white" />
-                <h2 className="text-lg font-semibold text-white">Jarvis responds:</h2>
-              </div>
-              <p className="text-gray-300">{response}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <SmartMirrorUI
+      isListening={isListening}
+      transcript={transcript}
+      response={response}
+      status={status}
+      selectedModel={selectedModel}
+      onModelChange={setSelectedModel}
+      errorMessage={errorMessage}
+      startRecording={startRecording}
+      isSpeaking={audioPlayer.current?.isPlaying}
+    />
   );
 };
 
