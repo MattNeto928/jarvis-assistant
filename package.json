@@ -15,16 +15,23 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.2",
     "@ffmpeg/ffmpeg": "^0.12.15",
+    "@google-cloud/aiplatform": "^3.34.0",
+    "@google/generative-ai": "^0.21.0",
     "@picovoice/porcupine-react": "^3.0.3",
     "@picovoice/porcupine-web": "^3.0.3",
     "@picovoice/web-voice-processor": "^4.0.9",
+    "@types/tizen-common-web": "^2.0.6",
+    "@types/tizen-tv-webapis": "^2.0.6",
     "axios": "^1.7.9",
     "elevenlabs-node": "^2.0.3",
     "lucide-react": "^0.474.0",
     "openai": "^4.80.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^2.15.1"
+    "recharts": "^2.15.1",
+    "samsung-tv-control": "^1.14.0",
+    "tizen-common-web": "^2.0.1",
+    "tizen-tv-webapis": "^2.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss7-compat": "^2.2.17",

@@ -1,12 +1,14 @@
-// src/components/SmartMirrorUI.jsx
 import React, { useState, useEffect } from 'react';
 import { Activity, Mic } from 'lucide-react';
 import { AreaChart, Area, XAxis, ResponsiveContainer } from 'recharts';
+// import SamsungRemote from './SamsungRemote';
+import SmartBulbControl from './bulb_control';
+import GeminiChat from './gemini';
 
 // Voice Wave Animation Component
 const VoiceWaves = ({ isActive, mode = 'listening' }) => {
   const waveCount = 4;
-  
+
   return (
     <div className="flex items-center gap-0.5 h-4">
       {[...Array(waveCount)].map((_, i) => (
@@ -17,8 +19,13 @@ const VoiceWaves = ({ isActive, mode = 'listening' }) => {
           }`}
           style={{
             height: isActive ? `${Math.random() * 100}%` : '20%',
-            animation: isActive ? `wave 600ms ease infinite` : 'none',
-            animationDelay: `${i * 100}ms`
+            animationName: isActive ? 'wave' : 'none',
+            animationDuration: '600ms',
+            animationTimingFunction: 'ease',
+            animationIterationCount: 'infinite',
+            animationDelay: `${i * 100}ms`,
+            animationDirection: 'normal', // Added to fully define the animation
+            animationFillMode: 'forwards' // Add to define what happens after the animation
           }}
         />
       ))}
@@ -36,10 +43,8 @@ const VoiceWaves = ({ isActive, mode = 'listening' }) => {
 // LLM Toggle Component
 const LLMToggle = ({ selectedModel, onModelChange }) => {
   const models = [
-    { id: 'sonar', name: 'Sonar', description: 'Real-time web' },
-    { id: 'claude', name: 'Claude', description: 'Fast responses' },
-    { id: 'deepseek', name: 'DeepSeek', description: 'Advanced reasoning' },
-    { id: 'gpt4', name: 'GPT-4', description: 'General knowledge' }
+    { id: 'gemini', name: 'Gemini', description: 'Fast responses' },
+    { id: 'sonar', name: 'Sonar', description: 'Real-time web' }
   ];
 
   return (
@@ -74,10 +79,11 @@ const SmartMirrorUI = ({
   status,
   isSpeaking,
   transcript,
-  response
+  response,
+  errorMessage // Added error message prop
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -117,17 +123,17 @@ const SmartMirrorUI = ({
       {/* Time Section */}
       <div className="text-center mb-20">
         <h1 style={{ fontSize: '10vh' }} className="font-thin tracking-tight leading-none">
-          {currentTime.toLocaleTimeString([], { 
-            hour: '2-digit', 
+          {currentTime.toLocaleTimeString([], {
+            hour: '2-digit',
             minute: '2-digit',
-            hour12: true 
+            hour12: true
           })}
         </h1>
         <p className="text-4xl text-white/60 mt-6 font-thin">
-          {currentTime.toLocaleDateString([], { 
-            weekday: 'long', 
-            month: 'long', 
-            day: 'numeric' 
+          {currentTime.toLocaleDateString([], {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric'
           })}
         </p>
       </div>
@@ -152,20 +158,20 @@ const SmartMirrorUI = ({
               <AreaChart data={stockData}>
                 <defs>
                   <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#fff" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#fff" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#fff" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#fff" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis 
-                  dataKey="time" 
+                <XAxis
+                  dataKey="time"
                   stroke="#ffffff20"
                   interval={4}
                   tick={{ fill: '#ffffff60', fontSize: 12 }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#ffffff" 
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#ffffff"
                   fill="url(#chartGradient)"
                   strokeWidth={1}
                 />
@@ -231,19 +237,26 @@ const SmartMirrorUI = ({
       </div>
 
       {/* Voice Interaction Overlay */}
-      {(transcript || response) && (
+      {(transcript || response || errorMessage) && (
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2">
           <div className="bg-black/80 backdrop-blur-sm rounded-2xl p-6 flex flex-col items-center gap-4">
+            {errorMessage && (
+              <div className="text-red-500 font-thin text-center break-words">
+                {errorMessage}
+              </div>
+            )}
             {transcript && (
               <div className="flex items-center gap-3">
                 <VoiceWaves isActive={isListening} />
-                <span className="text-white/80 font-thin">{transcript}</span>
+                <span className="text-white/80 font-thin break-words">{transcript}</span>
               </div>
             )}
             {response && (
               <div className="flex items-center gap-3">
                 <VoiceWaves isActive={isSpeaking} mode="speaking" />
-                <span className="text-white/80 font-thin">{response}</span>
+                <span className="text-white/80 font-thin break-words whitespace-pre-line">
+                  {response}
+                </span>
               </div>
             )}
           </div>
